@@ -5,7 +5,7 @@ import time
 import os
 import sys
 
-LICENSE_API_URL = "https://your-api-url.com/check_license"  # Replace with real URL
+LICENSE_API_URL = "https://license-api-dsxu.onrender.com"  # Replace with real URL
 SHARED_LICENSE_KEY = "BETA2025"  # Public info – no secrets
 
 # --- ANTI DEBUG ---
