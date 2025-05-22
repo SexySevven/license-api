@@ -1,50 +1,53 @@
-import requests
-import hashlib
-import getpass
+from flask import Flask, request, jsonify
+import json
 import time
+import hashlib
 import os
-import sys
 
-LICENSE_API_URL = "https://license-api-dsxu.onrender.com"  # Replace with real URL
-SHARED_LICENSE_KEY = "BETA2025"  # Public info – no secrets
+app = Flask(__name__)
 
-# --- ANTI DEBUG ---
-def anti_debug():
-    if sys.gettrace():
-        print("🚨 Debugger detected. Exiting.")
-        os._exit(1)
+LICENSE_FILE = "license_data.json"
 
-# --- DEVICE FINGERPRINT ---
-def get_device_id():
-    username = getpass.getuser()
-    return hashlib.sha256(username.encode()).hexdigest()
+DEFAULT_LICENSE = {
+    "key": "BETA2025",
+    "start_time": int(time.time()),
+    "duration_days": 3,
+    "max_users": 5,
+    "allowed_devices": []
+}
 
-# --- LICENSE CHECK ---
+def load_license():
+    if not os.path.exists(LICENSE_FILE):
+        with open(LICENSE_FILE, "w") as f:
+            json.dump(DEFAULT_LICENSE, f, indent=2)
+    with open(LICENSE_FILE, "r") as f:
+        return json.load(f)
+
+def save_license(data):
+    with open(LICENSE_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+@app.route("/check_license", methods=["POST"])
 def check_license():
-    anti_debug()  # Kill if debugger present
+    data = request.json
+    device_id = data.get("device_id")
+    key = data.get("key")
+    now = int(data.get("timestamp", time.time()))
 
-    device_id = get_device_id()
-    now = int(time.time())
+    license_data = load_license()
+    expiry_time = license_data["start_time"] + license_data["duration_days"] * 86400
 
-    try:
-        response = requests.post(LICENSE_API_URL, json={
-            "device_id": device_id,
-            "key": SHARED_LICENSE_KEY,
-            "timestamp": now
-        }, timeout=5)
+    if key != license_data["key"]:
+        return jsonify({"status": "invalid_key"}), 401
+    if now > expiry_time:
+        return jsonify({"status": "expired"}), 403
+    if device_id in license_data["allowed_devices"]:
+        return jsonify({"status": "valid"})
+    if len(license_data["allowed_devices"]) < license_data["max_users"]:
+        license_data["allowed_devices"].append(device_id)
+        save_license(license_data)
+        return jsonify({"status": "registered"})
+    return jsonify({"status": "full"}), 403
 
-        if response.status_code == 200:
-            result = response.json()["status"]
-            if result in ["valid", "registered"]:
-                print("✅ License verified.")
-                return True
-            else:
-                print(f"❌ Access denied: {result}")
-        else:
-            print(f"❌ Server error: {response.status_code}")
-
-    except Exception as e:
-        print(f"❌ License check failed: {e}")
-
-    os._exit(1)  # Hard kill on failure
-    return False
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
