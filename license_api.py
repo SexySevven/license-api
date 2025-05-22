@@ -10,7 +10,7 @@ LICENSE_FILE = "license_data.json"
 
 DEFAULT_LICENSE = {
     "key": "BETA2025",
-    "start_time": int(time.time()),
+    "start_time": 1716508800,
     "duration_days": 3,
     "max_users": 5,
     "allowed_devices": []
